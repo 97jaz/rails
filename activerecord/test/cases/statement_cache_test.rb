@@ -111,6 +111,15 @@ module ActiveRecord
       assert_not_equal book, other_book
     end
 
+    def test_unprepared_statements_lock_connection
+      connection = Book.connection
+      lock = connection.lock
+
+      connection.unprepared_statement do
+        assert(lock.mon_locked? && lock.mon_owned?)
+      end
+    end
+
     def test_find_by_does_not_use_statement_cache_if_table_name_is_changed
       book = Book.create(name: "my book")
 
