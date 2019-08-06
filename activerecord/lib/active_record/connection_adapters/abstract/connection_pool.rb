@@ -352,6 +352,29 @@ module ActiveRecord
         end
       end
 
+      # When a pool's @lock_thread is truthy, a single database
+      # connection is shared among all server threads. (This is used
+      # for transactional fixtures in system tests.) This class is
+      # used to wrap the shared connection so that all access to it
+      # is synchronized on the connection's monitor lock.
+      class SharedConnection # :nodoc:
+        attr_reader :conn
+
+        def initialize(conn)
+          @conn = conn
+        end
+
+        def respond_to_missing?(method_name, *args)
+          conn.respond_to?(method_name, *args)
+        end
+
+        def method_missing(method_name, *args, &block)
+          conn.lock.synchronize do
+            conn.send(method_name, *args, &block)
+          end
+        end
+      end
+
       include MonitorMixin
       include QueryCache::ConnectionPoolConfiguration
       include ConnectionAdapters::AbstractPool
@@ -426,7 +449,13 @@ module ActiveRecord
       # #connection can be called any number of times; the connection is
       # held in a cache keyed by a thread.
       def connection
-        @thread_cached_conns[connection_cache_key(current_thread)] ||= checkout
+        conn = @thread_cached_conns[connection_cache_key(current_thread)] ||= checkout
+
+        if @lock_thread
+          SharedConnection.new(conn)
+        else
+          conn
+        end
       end
 
       # Returns true if there is an open connection being used for the current thread.
