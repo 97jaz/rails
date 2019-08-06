@@ -57,17 +57,19 @@ module ActiveRecord
 
       # Returns an ActiveRecord::Result instance.
       def select_all(arel, name = nil, binds = [], preparable: nil)
-        arel = arel_from_relation(arel)
-        sql, binds = to_sql_and_binds(arel, binds)
+        @lock.synchronize do
+          arel = arel_from_relation(arel)
+          sql, binds = to_sql_and_binds(arel, binds)
 
-        if preparable.nil?
-          preparable = prepared_statements ? visitor.preparable : false
-        end
+          if preparable.nil?
+            preparable = prepared_statements ? visitor.preparable : false
+          end
 
-        if prepared_statements && preparable
-          select_prepared(sql, name, binds)
-        else
-          select(sql, name, binds)
+          if prepared_statements && preparable
+            select_prepared(sql, name, binds)
+          else
+            select(sql, name, binds)
+          end
         end
       end
 
