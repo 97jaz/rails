@@ -128,9 +128,10 @@ module ActiveRecord
         @statements = build_statement_pool
         @lock = ActiveSupport::Concurrency::LoadInterlockAwareMonitor.new
 
+        @visitor.extend(DetermineIfPreparableVisitor)
+
         if self.class.type_cast_config_to_boolean(config.fetch(:prepared_statements) { true })
           @prepared_statement_status = Concurrent::ThreadLocalVar.new(true)
-          @visitor.extend(DetermineIfPreparableVisitor)
         else
           @prepared_statement_status = Concurrent::ThreadLocalVar.new(false)
         end
@@ -260,6 +261,10 @@ module ActiveRecord
       def seconds_idle # :nodoc:
         return 0 if in_use?
         Concurrent.monotonic_time - @idle_since
+      end
+
+      def prepared_statement
+        @prepared_statement_status.bind(true) { yield }
       end
 
       def unprepared_statement

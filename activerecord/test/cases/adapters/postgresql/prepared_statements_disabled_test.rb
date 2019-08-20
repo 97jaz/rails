@@ -24,4 +24,16 @@ class PreparedStatementsDisabledTest < ActiveRecord::PostgreSQLTestCase
     assert_equal david, Developer.where(name: "David").last # With Binds
     assert_operator Developer.count, :>, 0 # Without Binds
   end
+
+  def test_prepared_statements_can_be_forced
+    puts Computer.where(id: 1).to_sql
+    unprepared_sql = Computer.where(id: 1).to_sql
+    prepared_sql = Computer.connection.prepared_statement do
+      puts Computer.where(name: 1).to_sql
+      Computer.where(id: 1).to_sql
+    end
+
+    assert_not unprepared_sql.include?("?")
+    assert prepared_sql.include?("?")
+  end
 end
